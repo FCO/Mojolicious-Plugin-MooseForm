@@ -116,7 +116,6 @@ sub register {
                         document.getElementById(myform[i].name).style.border           = "1px solid black";
                         document.getElementById(myform[i].name).style.backgroundColor  = "white";
                         //document.getElementById(myform[i].name).style.position         = "absolute";
-                        var name = myform[i].name;
                         myform[i].parentNode.parentNode.onmouseover = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "block"}
                         myform[i].parentNode.parentNode.onmouseout  = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "none"}
                      }
