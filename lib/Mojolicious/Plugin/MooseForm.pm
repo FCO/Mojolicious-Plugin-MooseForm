@@ -186,6 +186,19 @@ END_HTML
       </script>
 END_HTML
    });
+
+   $app->helper("template_is_setted" => sub{
+      my $self = shift;
+      my $stash = $self->stash;
+
+      my $template = $stash->{template};
+      unless ($template) {
+         if ($self->match->endpoint) {
+           $template = $self->match->endpoint->name;
+         }
+      }
+      return !! $template;
+   });
    
    $app->routes->add_shortcut( "form" => sub { 
       my $self   = shift;
@@ -204,9 +217,8 @@ END_HTML
       my $pname = pop @scalar;
       my $gname = pop @scalar;
 
-      $created_form = $app->create_form_for($url) if not $gname;
    
-      push @pars, $pname if $pname;
+      #push @pars, $pname if $pname;
    
       my $post_orig = pop @code;
       my $get_orig  = pop @code;
@@ -239,13 +251,19 @@ END_HTML
             $self->stash->{$_} = $stash->{$_};
          }
          if( $get_orig ) {
-            return $self->$get_orig( @_ ) ;
+            $self->$get_orig( @_ ) ;
          }
-         return $self->render( $gname ) if not $created_form;
-         $self->render( inline => $created_form, url_form => $url );
+         $self->stash->{ template } = $gname if $gname;
+         if($self->app->renderer->render($self, $self->stash)) {
+            return $self->render;
+         } else {
+            #return $self->render( $gname ) if $gname;
+            $created_form = $app->create_form_for($url);
+            $self->render( inline => $created_form, url_form => $url );
+         }
       };
-      $self->get ($url, $get , @pars);
-      $self->post($url, $post, @pars);
+      $self->get ($url, $get , @pars, $gname);
+      $self->post($url, $post, @pars, $pname);
    });
    
    *main::form = sub{ $app->routes->form( @_ ) };
