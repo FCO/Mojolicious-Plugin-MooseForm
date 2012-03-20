@@ -62,6 +62,7 @@ sub register {
       $self->stash->{ attributes } = [
          map {
             {
+               title => join(" ", map{ "\u$_" } split /_+/, $_->name),
                name  => $_->name,
                value => $self->flash($_->name) || $_->default,
                doc   => $_->documentation,
@@ -82,79 +83,70 @@ sub register {
       $self->stash->{par_value} = $self->flash( "par_value" ) if $self->flash( "par_value" );
    });
 
-   {
-      my $created;
-      $app->helper("create_test_value_js_func" => sub {
-         my $self  = shift;
-         my $url   = shift;
-
-         return "" if $created++;
-   
-         return << "END_HTML";
-         <script>
-            function test_values_from() {
-               var xmlhttp = new XMLHttpRequest();
-               var url = "$url$test_value_url";
-               console.log( this ); 
-               var myform = this.getElementsByTagName("INPUT");
-               var test = true;
-               for(var i = 0; i < myform.length; i++) {
-                  if(myform[i].name != undefined && myform[i].name != "") {
-                     var new_url = url.replace(/:name/, myform[i].name);
-                     xmlhttp.open("GET", new_url + "?value=" + myform[i].value, false);
-                     xmlhttp.send();
-                     test = test && xmlhttp.responseText == "OK";
-                     if( xmlhttp.responseText != "OK" ) {
-                        document.getElementById(myform[i].name).style.display          = "block";
-                        document.getElementById(myform[i].name).style.border           = "1px solid red";
-                        document.getElementById(myform[i].name).style.backgroundColor  = "#ffaaaa";
-                        //document.getElementById(myform[i].name).style.position         = "relative";
-                        myform[i].parentNode.parentNode.onmouseover = undefined;
-                        myform[i].parentNode.parentNode.onmouseout  = undefined;
-                     } else {
-                        document.getElementById(myform[i].name).style.display          = "none";
-                        document.getElementById(myform[i].name).style.border           = "1px solid black";
-                        document.getElementById(myform[i].name).style.backgroundColor  = "white";
-                        //document.getElementById(myform[i].name).style.position         = "absolute";
-                        myform[i].parentNode.parentNode.onmouseover = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "block"}
-                        myform[i].parentNode.parentNode.onmouseout  = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "none"}
-                     }
+   $app->routes->get("/js/test_values_from/*url" => sub{ 
+      my $self = shift;
+      my $url  = $self->stash->{url};
+      $self->render( inline => << 'END_HTML', url => $url, test_value_url => $test_value_url );
+         function test_values_from() {
+            var xmlhttp = new XMLHttpRequest();
+            var url = "<%= $url . $test_value_url =%>";
+            console.log( this ); 
+            var myform = this.getElementsByTagName("INPUT");
+            var test = true;
+            for(var i = 0; i < myform.length; i++) {
+               if(myform[i].name != undefined && myform[i].name != "") {
+                  var new_url = url.replace(/:name/, myform[i].name);
+                  xmlhttp.open("GET", new_url + "?value=" + myform[i].value, false);
+                  xmlhttp.send();
+                  test = test && xmlhttp.responseText == "OK";
+                  if( xmlhttp.responseText != "OK" ) {
+                     document.getElementById(myform[i].name).style.display          = "block";
+                     document.getElementById(myform[i].name).style.border           = "1px solid red";
+                     document.getElementById(myform[i].name).style.backgroundColor  = "#ffaaaa";
+                     //document.getElementById(myform[i].name).style.position         = "relative";
+                     myform[i].parentNode.parentNode.onmouseover = undefined;
+                     myform[i].parentNode.parentNode.onmouseout  = undefined;
+                  } else {
+                     document.getElementById(myform[i].name).style.display          = "none";
+                     document.getElementById(myform[i].name).style.border           = "1px solid black";
+                     document.getElementById(myform[i].name).style.backgroundColor  = "white";
+                     //document.getElementById(myform[i].name).style.position         = "absolute";
+                     myform[i].parentNode.parentNode.onmouseover = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "block"}
+                     myform[i].parentNode.parentNode.onmouseout  = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "none"}
                   }
                }
-               return test;
             }
-         </script>
+            return test;
+         }
 END_HTML
-      });
-   }
+   } => "__js_test_values_from__");
     
    $app->helper("create_form_for" => sub {
       my $self  = shift;
-      my $class = shift;
-      my $url   = shift;
 
-      return (($test_urls ? $self->create_test_value_js_func($url) : "") . << "END_HTML");
-      <span class="error"><%= \$error_str =%></span>
+      return << 'END_HTML';
+      <script src="<%= url_for( "__js_test_values_from__", url => $url_form ) =%>"></script>
+      <span class="error"><%= $error_str =%></span>
       <form method=post>
          <table width=100%>
-            <% for my \$attr(sort { \$a->{ name } cmp \$b->{ name }  } \@\$attributes) { %>
+            <% for my $attr(sort { $a->{ name } cmp $b->{ name }  } @$attributes) { %>
                <tr
-                <% if(\$attr->{doc}) { =%>
-                   onmouseover='document.getElementById("<%= \$attr->{name} =%>").style.display = "block"'
-                   onmouseout='document.getElementById("<%= \$attr->{name} =%>").style.display = "none"'
+                <% if($attr->{doc}) { =%>
+                   onmouseover='document.getElementById("<%= $attr->{name} =%>").style.display = "block"'
+                   onmouseout='document.getElementById("<%= $attr->{name} =%>").style.display = "none"'
                 <% } =%>
                >
                   <td>
-                     <%= \$attr->{name} =%>: 
+                     <%= $attr->{title} =%>: 
                   </td>
                   <td>
-                     <% given( \$attr->{type} ) { %>
+                     <% given( $attr->{type} ) { %>
                         <% when( "Bool" ) { %>
                            <input
                             type="checkbox"
-                            name="<%= \$attr->{name} =%>"
+                            name="<%= $attr->{name} =%>"
                             value="1"
-                            <% if(\$attr->{value}) { =%>"
+                            <% if($attr->{value}) { =%>"
                                checked=1
                             <% } =%>
                            >
@@ -163,24 +155,24 @@ END_HTML
                         <% default { %>
                            <input
                             type="text"
-                            name="<%= \$attr->{name} =%>"
-                            value="<%= \$attr->{value} =%>"
+                            name="<%= $attr->{name} =%>"
+                            value="<%= $attr->{value} =%>"
                            >
-                           <% if(\$attr->{req}) { =%>
+                           <% if($attr->{req}) { =%>
                               <span style="color: red">*</span>
                            <% } =%>
                         <% } %>
                      <% } =%>
                   </td>
                </tr>
-               <% if(\$attr->{doc}) { =%>
+               <% if($attr->{doc}) { =%>
                   <tr>
                      <td
                       colspan=2
-                      id="<%= \$attr->{name} =%>"
+                      id="<%= $attr->{name} =%>"
                       style="position: relative; display: none; background-color: white; border: 1px solid black;"
                      >
-                        <%= \$attr->{doc} =%>
+                        <%= $attr->{doc} =%>
                      </td>
                   </tr>
                <% } =%>
@@ -207,10 +199,12 @@ END_HTML
 
       my $class = shift @scalar;
 
+      my $created_form;
+
       my $pname = pop @scalar;
       my $gname = pop @scalar;
 
-      my $created_form = $app->create_form_for($class, $url) if not $gname;
+      $created_form = $app->create_form_for($url) if not $gname;
    
       push @pars, $pname if $pname;
    
@@ -247,8 +241,8 @@ END_HTML
          if( $get_orig ) {
             return $self->$get_orig( @_ ) ;
          }
-         return $self->render( $gname ) if $gname;
-         $self->render( inline => $created_form );
+         return $self->render( $gname ) if not $created_form;
+         $self->render( inline => $created_form, url_form => $url );
       };
       $self->get ($url, $get , @pars);
       $self->post($url, $post, @pars);

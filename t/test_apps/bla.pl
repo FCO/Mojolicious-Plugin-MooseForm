@@ -16,11 +16,17 @@ get "/" => sub {
    $self->render( "form" );
 } => "form";
 
+form "/test_with_name", "BlaBleBli" => sub {
+   my $self = shift;
+   my $obj  = shift;
+   $self->render_text( "form test: " . $obj->bla ) ;
+} => "form" => "form";
+
 form "/test", "BlaBleBli" => sub {
    my $self = shift;
    my $obj  = shift;
    $self->render_text( "form test: " . $obj->bla ) ;
-} => "form";
+};
 
 app->start
 
