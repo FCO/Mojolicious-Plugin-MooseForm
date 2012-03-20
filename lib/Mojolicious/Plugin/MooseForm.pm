@@ -82,48 +82,53 @@ sub register {
       $self->stash->{par_value} = $self->flash( "par_value" ) if $self->flash( "par_value" );
    });
 
-   $app->helper("create_test_value_js_func" => sub {
-      my $self  = shift;
-      my $url   = shift;
+   {
+      my $created;
+      $app->helper("create_test_value_js_func" => sub {
+         my $self  = shift;
+         my $url   = shift;
 
-      return << "END_HTML";
-      <script>
-         var xmlhttp = new XMLHttpRequest();
-         function test_values_from(class) {
-            var url = "$url$test_value_url";
-            var myform = document.forms[class].getElementsByTagName("INPUT");
-            var test = true;
-            for(var i = 0; i < myform.length; i++) {
-               if(myform[i].name != undefined && myform[i].name != "") {
-                  var new_url = url.replace(/:name/, myform[i].name);
-                  xmlhttp.open("GET", new_url + "?value=" + myform[i].value, false);
-                  xmlhttp.send();
-                  test = test && xmlhttp.responseText == "OK";
-                  if( xmlhttp.responseText != "OK" ) {
-                     document.getElementById(myform[i].name).style.display          = "block";
-                     document.getElementById(myform[i].name).style.border           = "1px solid red";
-                     document.getElementById(myform[i].name).style.backgroundColor  = "#ffaaaa";
-                     document.getElementById(myform[i].name).style.position         = "relative";
-                     myform[i].onmouseover = undefined;
-                     myform[i].onmouseout  = undefined;
-                  } else {
-                     document.getElementById(myform[i].name).style.display          = "none";
-                     document.getElementById(myform[i].name).style.border           = "1px solid black";
-                     document.getElementById(myform[i].name).style.backgroundColor  = "white";
-                     document.getElementById(myform[i].name).style.position         = "absolute";
-                     var name = myform[i].name;
-                     myform[i].onmouseover = function(){document.getElementById(name).style.display = "block"}
-                     myform[i].onmouseout  = function(){document.getElementById(name).style.display = "none"}
+         return "" if $created++;
+   
+         return << "END_HTML";
+         <script>
+            function test_values_from() {
+               var xmlhttp = new XMLHttpRequest();
+               var url = "$url$test_value_url";
+               console.log( this ); 
+               var myform = this.getElementsByTagName("INPUT");
+               var test = true;
+               for(var i = 0; i < myform.length; i++) {
+                  if(myform[i].name != undefined && myform[i].name != "") {
+                     var new_url = url.replace(/:name/, myform[i].name);
+                     xmlhttp.open("GET", new_url + "?value=" + myform[i].value, false);
+                     xmlhttp.send();
+                     test = test && xmlhttp.responseText == "OK";
+                     if( xmlhttp.responseText != "OK" ) {
+                        document.getElementById(myform[i].name).style.display          = "block";
+                        document.getElementById(myform[i].name).style.border           = "1px solid red";
+                        document.getElementById(myform[i].name).style.backgroundColor  = "#ffaaaa";
+                        //document.getElementById(myform[i].name).style.position         = "relative";
+                        myform[i].parentNode.parentNode.onmouseover = undefined;
+                        myform[i].parentNode.parentNode.onmouseout  = undefined;
+                     } else {
+                        document.getElementById(myform[i].name).style.display          = "none";
+                        document.getElementById(myform[i].name).style.border           = "1px solid black";
+                        document.getElementById(myform[i].name).style.backgroundColor  = "white";
+                        //document.getElementById(myform[i].name).style.position         = "absolute";
+                        var name = myform[i].name;
+                        myform[i].parentNode.parentNode.onmouseover = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "block"}
+                        myform[i].parentNode.parentNode.onmouseout  = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "none"}
+                     }
                   }
                }
+               return test;
             }
-            return test;
-         }
-      </script>
+         </script>
 END_HTML
-   });
+      });
+   }
     
-
    $app->helper("create_form_for" => sub {
       my $self  = shift;
       my $class = shift;
@@ -131,30 +136,63 @@ END_HTML
 
       return (($test_urls ? $self->create_test_value_js_func($url) : "") . << "END_HTML");
       <span class="error"><%= \$error_str =%></span>
-      <form name="$class" method=post>
-         <% for my \$attr(\@\$attributes) { %>
-            <%= \$attr->{name} =%>: 
-            <input
-             type="text"
-             name="<%= \$attr->{name} =%>"
-             value="<%= \$attr->{value} =%>"
-             <% if(\$attr->{doc}) { =%>
-                onmouseover='document.getElementById("<%= \$attr->{name} =%>").style.display = "block"'
-                onmouseout='document.getElementById("<%= \$attr->{name} =%>").style.display = "none"'
-             <% } =%>
-            >
-            <% if(\$attr->{req}) { =%>
-               <span style="color: red">*</span>
-            <% } =%>
-            <BR>
-             <% if(\$attr->{doc}) { =%>
-                <span id="<%= \$attr->{name} =%>" style="position: relative; display: none; background-color: white; border: 1px solid black;">
-                   <%= \$attr->{doc} =%>
-                </span>
-             <% } =%>
-         <% } %>
-         <input type=submit value="OK" onclick="return test_values_from($class)">
+      <form method=post>
+         <table width=100%>
+            <% for my \$attr(sort { \$a->{ name } cmp \$b->{ name }  } \@\$attributes) { %>
+               <tr
+                <% if(\$attr->{doc}) { =%>
+                   onmouseover='document.getElementById("<%= \$attr->{name} =%>").style.display = "block"'
+                   onmouseout='document.getElementById("<%= \$attr->{name} =%>").style.display = "none"'
+                <% } =%>
+               >
+                  <td>
+                     <%= \$attr->{name} =%>: 
+                  </td>
+                  <td>
+                     <% given( \$attr->{type} ) { %>
+                        <% when( "Bool" ) { %>
+                           <input
+                            type="checkbox"
+                            name="<%= \$attr->{name} =%>"
+                            value="1"
+                            <% if(\$attr->{value}) { =%>"
+                               checked=1
+                            <% } =%>
+                           >
+                        <% } %>
+
+                        <% default { %>
+                           <input
+                            type="text"
+                            name="<%= \$attr->{name} =%>"
+                            value="<%= \$attr->{value} =%>"
+                           >
+                           <% if(\$attr->{req}) { =%>
+                              <span style="color: red">*</span>
+                           <% } =%>
+                        <% } %>
+                     <% } =%>
+                  </td>
+               </tr>
+               <% if(\$attr->{doc}) { =%>
+                  <tr>
+                     <td
+                      colspan=2
+                      id="<%= \$attr->{name} =%>"
+                      style="position: relative; display: none; background-color: white; border: 1px solid black;"
+                     >
+                        <%= \$attr->{doc} =%>
+                     </td>
+                  </tr>
+               <% } =%>
+            <% } %>
+            <tr><td colspan=2><input type=submit value="OK"></td></tr>
+         </table>
       </form>
+      <script>
+         for( var i = 0; i < document.forms.length; i++ ) 
+            document.forms[ i ].onsubmit = test_values_from;
+      </script>
 END_HTML
    });
    
