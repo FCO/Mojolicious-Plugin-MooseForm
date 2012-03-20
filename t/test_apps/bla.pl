@@ -40,3 +40,15 @@ __DATA__
    <input type=test name=bla value="<%= $bla =%>">
    <input type=submit value=OK>
 </form>
+
+@@ template_for_type_bool.html.ep
+
+<input
+ type="checkbox"
+ name="<%= $attr->{name} =%>"
+ value="1"
+ <% if($attr->{value}) { =%>"
+    checked=1
+ <% } =%>
+> from __DATA__
+

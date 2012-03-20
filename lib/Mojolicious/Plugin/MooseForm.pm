@@ -1,5 +1,6 @@
 package Mojolicious::Plugin::MooseForm;
 use Mojo::Base 'Mojolicious::Plugin';
+use Mojolicious::Plugin::MooseForm::TemplateGenerator;
 use Carp;
 use v5.10;
 
@@ -10,6 +11,8 @@ sub register {
    my $test_value_url = $conf->{test_value_url} || "/__attribute_ajax__/test_value/:name";
    croak "test_value_url must have a parameter 'name'" unless $test_value_url =~ m{[\.:*]name(?:/|$)};
    my $test_urls = $conf->{test_urls} // 1;
+
+   my $tempGen = Mojolicious::Plugin::MooseForm::TemplateGenerator->new;
 
    $app->helper("params_class" => sub{
       my $self  = shift;
@@ -86,107 +89,9 @@ sub register {
    $app->routes->get("/js/test_values_from/*url" => sub{ 
       my $self = shift;
       my $url  = $self->stash->{url};
-      $self->render( inline => << 'END_HTML', url => $url, test_value_url => $test_value_url );
-         function test_values_from() {
-            var xmlhttp = new XMLHttpRequest();
-            var url = "<%= $url . $test_value_url =%>";
-            console.log( this ); 
-            var myform = this.getElementsByTagName("INPUT");
-            var test = true;
-            for(var i = 0; i < myform.length; i++) {
-               if(myform[i].name != undefined && myform[i].name != "") {
-                  var new_url = url.replace(/:name/, myform[i].name);
-                  xmlhttp.open("GET", new_url + "?value=" + myform[i].value, false);
-                  xmlhttp.send();
-                  test = test && xmlhttp.responseText == "OK";
-                  if( xmlhttp.responseText != "OK" ) {
-                     document.getElementById(myform[i].name).style.display          = "block";
-                     document.getElementById(myform[i].name).style.border           = "1px solid red";
-                     document.getElementById(myform[i].name).style.backgroundColor  = "#ffaaaa";
-                     //document.getElementById(myform[i].name).style.position         = "relative";
-                     myform[i].parentNode.parentNode.onmouseover = undefined;
-                     myform[i].parentNode.parentNode.onmouseout  = undefined;
-                  } else {
-                     document.getElementById(myform[i].name).style.display          = "none";
-                     document.getElementById(myform[i].name).style.border           = "1px solid black";
-                     document.getElementById(myform[i].name).style.backgroundColor  = "white";
-                     //document.getElementById(myform[i].name).style.position         = "absolute";
-                     myform[i].parentNode.parentNode.onmouseover = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "block"}
-                     myform[i].parentNode.parentNode.onmouseout  = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "none"}
-                  }
-               }
-            }
-            return test;
-         }
-END_HTML
+      $self->render( inline => $tempGen->get_template( "js_test_values_from"), url => $url, test_value_url => $test_value_url );
    } => "__js_test_values_from__");
     
-   $app->helper("create_form_for" => sub {
-      my $self  = shift;
-
-      return << 'END_HTML';
-      <script src="<%= url_for( "__js_test_values_from__", url => $url_form ) =%>"></script>
-      <span class="error"><%= $error_str =%></span>
-      <form method=post>
-         <table width=100%>
-            <% for my $attr(sort { $a->{ name } cmp $b->{ name }  } @$attributes) { %>
-               <tr
-                <% if($attr->{doc}) { =%>
-                   onmouseover='document.getElementById("<%= $attr->{name} =%>").style.display = "block"'
-                   onmouseout='document.getElementById("<%= $attr->{name} =%>").style.display = "none"'
-                <% } =%>
-               >
-                  <td>
-                     <%= $attr->{title} =%>: 
-                  </td>
-                  <td>
-                     <% given( $attr->{type} ) { %>
-                        <% when( "Bool" ) { %>
-                           <input
-                            type="checkbox"
-                            name="<%= $attr->{name} =%>"
-                            value="1"
-                            <% if($attr->{value}) { =%>"
-                               checked=1
-                            <% } =%>
-                           >
-                        <% } %>
-
-                        <% default { %>
-                           <input
-                            type="text"
-                            name="<%= $attr->{name} =%>"
-                            value="<%= $attr->{value} =%>"
-                           >
-                           <% if($attr->{req}) { =%>
-                              <span style="color: red">*</span>
-                           <% } =%>
-                        <% } %>
-                     <% } =%>
-                  </td>
-               </tr>
-               <% if($attr->{doc}) { =%>
-                  <tr>
-                     <td
-                      colspan=2
-                      id="<%= $attr->{name} =%>"
-                      style="position: relative; display: none; background-color: white; border: 1px solid black;"
-                     >
-                        <%= $attr->{doc} =%>
-                     </td>
-                  </tr>
-               <% } =%>
-            <% } %>
-            <tr><td colspan=2><input type=submit value="OK"></td></tr>
-         </table>
-      </form>
-      <script>
-         for( var i = 0; i < document.forms.length; i++ ) 
-            document.forms[ i ].onsubmit = test_values_from;
-      </script>
-END_HTML
-   });
-
    $app->helper("template_is_setted" => sub{
       my $self = shift;
       my $stash = $self->stash;
@@ -258,8 +163,8 @@ END_HTML
             return $self->render;
          } else {
             #return $self->render( $gname ) if $gname;
-            $created_form = $app->create_form_for($url);
-            $self->render( inline => $created_form, url_form => $url );
+            $created_form = $tempGen->get_template( "create_form_for", $url);
+            $self->render( inline => $created_form, url_form => $url, get_template => sub { $tempGen->get_template( @_ ) }, c => $self );
          }
       };
       $self->get ($url, $get , @pars, $gname);
