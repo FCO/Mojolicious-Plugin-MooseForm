@@ -13,6 +13,11 @@ sub register {
    my $test_urls = $conf->{test_urls} // 1;
 
    my $tempGen = Mojolicious::Plugin::MooseForm::TemplateGenerator->new;
+   if(exists $conf->{plugin}) {
+      for(@{ref $conf->{plugin} eq "ARRAY" ? $conf->{plugin} : [$conf->{plugin}]}) {
+         $tempGen->add_plugin($_);
+      }
+   }
 
    $app->helper("params_class" => sub{
       my $self  = shift;

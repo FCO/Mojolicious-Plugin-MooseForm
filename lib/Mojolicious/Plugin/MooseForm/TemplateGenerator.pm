@@ -1,8 +1,9 @@
 package Mojolicious::Plugin::MooseForm::TemplateGenerator;
 use Moose;
 use v5.10;
+use Data::Dumper;
 
-has plugins => ( is => 'ro', isa => "ArrayRef", default =>sub{ [] } ) ;
+has plugins => ( is => 'ro', isa => "ArrayRef", default => sub{ [] } ) ;
 
 sub get_template {
    my $self = shift;
@@ -78,7 +79,7 @@ sub create_form_for {
             <% if($attr->{doc}) { =%>
                <tr>
                   <td
-                   colspam=2
+                   colspan=2
                    id="<%= $attr->{name} =%>"
                    style="position: relative; display: none; background-color: white; border: 1px solid black;"
                   >
@@ -87,7 +88,7 @@ sub create_form_for {
                </tr>
             <% } =%>
          <% } %>
-         <tr><td colspam=2><input type=submit value="OK"></td></tr>
+         <tr><td colspan=2><input type=submit value="OK"></td></tr>
       </table>
    </form>
    <script>
@@ -97,57 +98,81 @@ sub create_form_for {
 END_HTML
 }
 
-sub template_for_type { 
-   my $tempGen = shift;
-   my $self    = shift;
-   my $type    = shift;
-   my $stash   = shift;
-   $type = lc $type;
-
+sub render {
+   my $self  = shift;
+   my $c     = shift;
+   my $stash = $c->stash;
+   my $template = shift;
+   $stash->{ template } = $template;
    my $output;
-   $stash->{ template } = "template_for_type_$type";
-   if( ($output) = $self->app->renderer->render($self, $stash) ) {
+   if( ($output) = $c->app->renderer->render($c, $stash) ) {
       return $output;
    }
-   given( $type ) { 
-      when( "bool" ) { 
-         ( $output ) = $self->app->renderer->render( $self, { %$stash, inline => << 'END_TYPE' } );
-               <input
-                type="checkbox"
-                name="<%= $attr->{name} =%>"
-                value="1"
-                <% if($attr->{value}) { =%>"
-                   checked=1
-                <% } =%>
-               >
+   ( $output ) = $c->app->renderer->render( $c, { %$stash, inline => $self->get_template($template, @_) } );
+   $output;
+}
+
+sub template_for_type { 
+   my $self   = shift;
+   my $c      = shift;
+   my $type   = shift;
+   my $stash  = shift;
+   $type = lc $type;
+
+   $c->stash->{$_} = $stash->{$_} for keys %$stash;
+
+   my $output = $self->render($c, "template_for_type_$type");
+   return $output if $output;
+   $self->render($c, "template_for_type_default");
+}
+
+sub template_for_type_bool { 
+   return << 'END_TYPE';
+      <input
+       type="checkbox"
+       name="<%= $attr->{name} =%>"
+       value="1"
+       <% if($attr->{value}) { =%>"
+          checked=1
+       <% } =%>
+      >
 END_TYPE
-         }
-      when( "default" ) { 
-           ( $output ) = $self->app->renderer->render( $self, { %$stash, inline => << 'END_TYPE' } );
-               <input
-                type="text"
-                name="<%= $attr->{name} =%>"
-                value="<%= $attr->{value} =%>"
-               >
-               <% if($attr->{req}) { =%>
-                  <span style="color: red">*</span>
-               <% } =%>
+}
+sub template_for_type_num { 
+   return << 'END_TYPE';
+      <input
+       type="text"
+       name="<%= $attr->{name} =%>"
+       value="<%= $attr->{value} =%>"
+      >
+      <% if($attr->{req}) { =%>
+         <span style="color: red">*</span>
+      <% } =%>
 END_TYPE
-         }
-      default {
-           ( $output ) = $self->app->renderer->render( $self, { %$stash, inline => << 'END_TYPE' } );
-               <input
-                type="text"
-                name="<%= $attr->{name} =%>"
-                value="<%= $attr->{value} =%>"
-               >
-               <% if($attr->{req}) { =%>
-                  <span style="color: red">*</span>
-               <% } =%>
+}
+sub template_for_type_str { 
+   return << 'END_TYPE';
+      <input
+       type="text"
+       name="<%= $attr->{name} =%>"
+       value="<%= $attr->{value} =%>"
+      >
+      <% if($attr->{req}) { =%>
+         <span style="color: red">*</span>
+      <% } =%>
 END_TYPE
-      }
-   }
-   return $output
+}
+sub template_for_type_default {
+   return << 'END_TYPE';
+      <input
+       type="text"
+       name="<%= $attr->{name} =%>"
+       value="<%= $attr->{value} =%>"
+      >
+      <% if($attr->{req}) { =%>
+         <span style="color: red">*</span>
+      <% } =%>
+END_TYPE
 }
 
 
