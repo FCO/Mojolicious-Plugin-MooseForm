@@ -137,7 +137,7 @@ sub template_for_type_arrayref {
    my $c     = shift;
    my $stash = shift;
    my $type  = shift;
-   delete $stash->{ value } ;
+   delete $stash->{ attr }->{ value } ;
    my $type_template = $self->render_type($c, $type, $stash);
 
    return << "END_TYPE";
