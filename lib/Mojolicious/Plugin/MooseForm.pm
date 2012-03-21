@@ -11,6 +11,7 @@ sub register {
    my $test_value_url = $conf->{test_value_url} || "/__attribute_ajax__/test_value/:name";
    croak "test_value_url must have a parameter 'name'" unless $test_value_url =~ m{[\.:*]name(?:/|$)};
    my $test_urls = $conf->{test_urls} // 1;
+   $conf->{ bgcolor } ||= [ "#E6E6FA", "white" ];
 
    my $tempGen = Mojolicious::Plugin::MooseForm::TemplateGenerator->new;
    if(exists $conf->{plugin}) {
@@ -22,6 +23,7 @@ sub register {
    $app->helper("params_class" => sub{
       my $self  = shift;
       my $class = shift;
+      $self->stash->{ bgcolor } = $conf->{ bgcolor };
 
       my ( $error, $par, $type, $val );
    
@@ -57,6 +59,7 @@ sub register {
    $app->helper("get_defaults" => sub{
       my $self  = shift;
       my $class = shift;
+      $self->stash->{ bgcolor } = $conf->{ bgcolor };
 
       my $meta = $class->meta;
       for($meta->get_all_attributes) {
@@ -69,10 +72,21 @@ sub register {
       }
       $self->stash->{ attributes } = [
          map {
+            my $val;
+            if($self->flash( $_->name ) ) {
+               $val = $self->flash( $_->name );
+               #if( ref $val ) {
+               #   
+               #}
+            } else {
+               $val = $_->is_default_a_coderef
+                      ? $_->default->($class)
+                      : $_->default;
+            }
             {
                title => join(" ", map{ "\u$_" } split /_+/, $_->name),
                name  => $_->name,
-               value => $self->flash($_->name) || $_->default,
+               value => $val,
                doc   => $_->documentation,
                type  => $_->type_constraint,
                req   => $_->is_required,

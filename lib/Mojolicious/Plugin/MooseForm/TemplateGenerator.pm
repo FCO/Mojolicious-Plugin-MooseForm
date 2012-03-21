@@ -58,12 +58,14 @@ END_HTML
 
 sub create_form_for {
    return << 'END_HTML';
+   <% my $line = 0; %>
    <script src="<%= url_for( "__js_test_values_from__", url => $url_form ) =%>"></script>
    <span class="error"><%= $error_str =%></span>
    <form method=post>
       <table width=100%>
          <% for my $attr(sort { $a->{ name } cmp $b->{ name }  } @$attributes) { %>
             <tr
+             style="background-color: <%= $bgcolor->[ $line++ % 2 ] =%>"
              <% if($attr->{doc}) { =%>
                 onmouseover='document.getElementById("<%= $attr->{name} =%>").style.display = "block"'
                 onmouseout='document.getElementById("<%= $attr->{name} =%>").style.display = "none"'
@@ -137,8 +139,18 @@ sub template_for_type_arrayref {
    my $c     = shift;
    my $stash = shift;
    my $type  = shift;
-   delete $stash->{ attr }->{ value } ;
+   my $def_arr = delete $stash->{ attr }->{ value } ;
+   my @type_template;
+   
    my $type_template = $self->render_type($c, $type, $stash);
+
+   for(@$def_arr) { 
+      $stash->{ attr }->{ value } = "$_";
+      push @type_template, $self->render_type($c, $type, $stash);
+   }
+
+   $stash->{ arr_type_template } = [ @type_template ];
+   $stash->{ attr }->{ value } = $def_arr;
 
    return << "END_TYPE";
       <div
@@ -148,6 +160,9 @@ sub template_for_type_arrayref {
       $type_template<br>
       </div>
       <div id="<%= \$attr->{ name } =%>_div">
+         <% for my \$def(\@\$arr_type_template) { %>
+               <%= b(\$def) =%><br>
+         <% } %>
       </div>
       <button
        onclick="document.getElementById('<%= \$attr->{ name } =%>_div').innerHTML += document.getElementById('<%= \$attr->{ name } =%>_template').innerHTML; return false;"
