@@ -73,7 +73,7 @@ sub create_form_for {
                   <%= $attr->{title} =%>: 
                </td>
                <td>
-                  <%= b($get_template->("template_for_type", $c, $attr->{ type }, { attr => $attr } )) =%>
+                  <%= b($get_template->("render_type", $c, $attr->{ type }, { attr => $attr } )) =%>
                </td>
             </tr>
             <% if($attr->{doc}) { =%>
@@ -108,22 +108,51 @@ sub render {
    if( ($output) = $c->app->renderer->render($c, $stash) ) {
       return $output;
    }
-   ( $output ) = $c->app->renderer->render( $c, { %$stash, inline => $self->get_template($template, @_) } );
+   ( $output ) = $c->app->renderer->render( $c, { %$stash, inline => $self->get_template($template, $c, $stash, @_) } );
    $output;
 }
 
-sub template_for_type { 
+sub render_type { 
    my $self   = shift;
    my $c      = shift;
    my $type   = shift;
    my $stash  = shift;
-   $type = lc $type;
+
+   my $sub_type;
+   if( defined $type ) {
+      $sub_type = $1 if $type =~ s/\[\s*(.*)\s*]\s*$//;
+      $type = lc $type;
+   } else {
+      $type = "default";
+   }
 
    $c->stash->{$_} = $stash->{$_} for keys %$stash;
 
-   my $output = $self->render($c, "template_for_type_$type");
+   my $output = $self->render($c, "template_for_type_$type", $sub_type);
    return $output if $output;
    $self->render($c, "template_for_type_default");
+}
+sub template_for_type_arrayref {
+   my $self  = shift;
+   my $c     = shift;
+   my $stash = shift;
+   my $type  = shift;
+   delete $stash->{ value } ;
+   my $type_template = $self->render_type($c, $type, $stash);
+
+   return << "END_TYPE";
+      <div
+       style="display: none"
+       id="<%= \$attr->{ name } =%>_template"
+      >
+      $type_template<br>
+      </div>
+      <div id="<%= \$attr->{ name } =%>_div">
+      </div>
+      <button
+       onclick="document.getElementById('<%= \$attr->{ name } =%>_div').innerHTML += document.getElementById('<%= \$attr->{ name } =%>_template').innerHTML; return false;"
+      > + </button>
+END_TYPE
 }
 
 sub template_for_type_bool { 
@@ -163,16 +192,8 @@ sub template_for_type_str {
 END_TYPE
 }
 sub template_for_type_default {
-   return << 'END_TYPE';
-      <input
-       type="text"
-       name="<%= $attr->{name} =%>"
-       value="<%= $attr->{value} =%>"
-      >
-      <% if($attr->{req}) { =%>
-         <span style="color: red">*</span>
-      <% } =%>
-END_TYPE
+   my $self = shift;
+   $self->template_for_type_str
 }
 
 
