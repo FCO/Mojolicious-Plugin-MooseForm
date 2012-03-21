@@ -154,7 +154,9 @@ sub register {
             my $self = shift;
             my $name = $self->param("name");
             my $attr = $class->meta->get_attribute($name);
-            eval{ $attr->verify_against_type_constraint( $self->param("value") ) };
+            my $val = $self->param("value");
+            $self->app->log->debug("VALUE: $val");
+            eval{ $attr->verify_against_type_constraint( $val ) };
             return $self->render_text("OK") unless $@;
             my $error = (split/\n/,$@)[0];
             $error =~ s{\s+at\s+/.*?/\w*?.pm\s+line\s+\d+$}{};

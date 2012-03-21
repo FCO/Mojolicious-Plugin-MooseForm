@@ -24,35 +24,55 @@ sub add_plugin {
 
 sub js_test_values_from {
    return << 'END_HTML';
-         function test_values_from() {
-            var xmlhttp = new XMLHttpRequest();
-            var url = "<%= $url . $test_value_url =%>";
-            console.log( this ); 
-            var myform = this.getElementsByTagName("INPUT");
-            var test = true;
-            for(var i = 0; i < myform.length; i++) {
-               if(myform[i].name != undefined && myform[i].name != "") {
-                  var new_url = url.replace(/:name/, myform[i].name);
-                  xmlhttp.open("GET", new_url + "?value=" + myform[i].value, false);
-                  xmlhttp.send();
-                  test = test && xmlhttp.responseText == "OK";
-                  if( xmlhttp.responseText != "OK" ) {
-                     document.getElementById(myform[i].name).style.display          = "block";
-                     document.getElementById(myform[i].name).style.border           = "1px solid red";
-                     document.getElementById(myform[i].name).style.backgroundColor  = "#ffaaaa";
-                     myform[i].parentNode.parentNode.onmouseover = undefined;
-                     myform[i].parentNode.parentNode.onmouseout  = undefined;
+      function test_values_from() {
+         var test = true;
+         var xmlhttp = new XMLHttpRequest();
+         var url = "<%= $url . $test_value_url =%>";
+         var rows = this.getElementsByTagName("TR");
+         for(var i = 0; i < rows.length; i++) {
+         console.log( i ) ;
+            var _this = rows[ i ];
+            var attr_name = _this.getAttribute( "attr" ); 
+            if(attr_name != null ) { 
+               console.log("iteracao");
+               var new_url = url.replace(/:name/, attr_name );
+               var inputs  = _this.getElementsByTagName( "INPUT" );
+               var myquery = "";
+
+               for( var j = 0; j < inputs.length; j++ ) 
+                  if(myquery == "")
+                     myquery = "?value=" + inputs[ j ].value;
+                  else
+                     myquery += "&value=" + inputs[ j ].value;
+
+               var my_url = new_url + myquery;
+               console.log("my_url: " + my_url);
+               xmlhttp.open("GET", my_url, false);
+               xmlhttp.send();
+               test = test && xmlhttp.responseText == "OK";
+               if( xmlhttp.status != 200 ) {
+                  test = false;
+                  return;
+               }
+               var doc = _this.getElementsByClassName("documentation")[ 0 ];
+               if( doc != null ) { 
+                  if(xmlhttp.responseText != "OK") {
+                     doc.style.display          = "block";
+                     doc.style.border           = "1px solid red";
+                     doc.style.backgroundColor  = "#ffaaaa";
+                     doc.style.position         = "relative";
+                     doc.getElementsByClassName("validation_error")[ 0 ].innerHTML = ":<BR>" + xmlhttp.responseText;
                   } else {
-                     document.getElementById(myform[i].name).style.display          = "none";
-                     document.getElementById(myform[i].name).style.border           = "1px solid black";
-                     document.getElementById(myform[i].name).style.backgroundColor  = "white";
-                     myform[i].parentNode.parentNode.onmouseover = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "block"}
-                     myform[i].parentNode.parentNode.onmouseout  = function(){this.parentNode.rows[ this.rowIndex + 1 ].style.display = "none"}
+                     doc.style.display          = "none";
+                     doc.style.border           = "1px solid black";
+                     doc.style.backgroundColor  = "white";
+                     doc.getElementsByClassName("validation_error")[ 0 ].innerHTML = "";
                   }
                }
             }
-            return test;
          }
+         return test;
+      }
 END_HTML
 }
 
@@ -61,42 +81,40 @@ sub create_form_for {
    <% my $line = 0; %>
    <script src="<%= url_for( "__js_test_values_from__", url => $url_form ) =%>"></script>
    <span class="error"><%= $error_str =%></span>
-   <form method=post>
+   <form
+    method=post
+    onsubmit="this.onsubmit = test_values_from; return this.onsubmit()"
+   >
       <table width=100%>
          <% for my $attr(sort { $a->{ name } cmp $b->{ name }  } @$attributes) { %>
             <tr
              style="background-color: <%= $bgcolor->[ $line++ % 2 ] =%>"
-             <% if($attr->{doc}) { =%>
-                onmouseover='document.getElementById("<%= $attr->{name} =%>").style.display = "block"'
-                onmouseout='document.getElementById("<%= $attr->{name} =%>").style.display = "none"'
-             <% } =%>
+             attr="<%= $attr->{ name }  =%>"
             >
                <td>
                   <%= $attr->{title} =%>: 
+                  <span
+                   id="<%= $attr->{name} =%>"
+                   class="documentation"
+                   style="position: absolute; display: none; background-color: white; border: 1px solid black;"
+                  >
+                     <% if($attr->{doc}) { =%>
+                        <%= $attr->{doc} =%>
+                     <% } =%>
+                     <span
+                      class="validation_error"
+                     >
+                     </span>
+                  </span>
                </td>
                <td>
                   <%= b($get_template->("render_type", $c, $attr->{ type }, { attr => $attr } )) =%>
                </td>
             </tr>
-            <% if($attr->{doc}) { =%>
-               <tr>
-                  <td
-                   colspan=2
-                   id="<%= $attr->{name} =%>"
-                   style="position: relative; display: none; background-color: white; border: 1px solid black;"
-                  >
-                     <%= $attr->{doc} =%>
-                  </td>
-               </tr>
-            <% } =%>
          <% } %>
          <tr><td colspan=2><input type=submit value="OK"></td></tr>
       </table>
    </form>
-   <script>
-      for( var i = 0; i < document.forms.length; i++ ) 
-         document.forms[ i ].onsubmit = test_values_from;
-   </script>
 END_HTML
 }
 

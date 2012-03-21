@@ -25,7 +25,7 @@ form "/test_with_name", "BlaBleBli" => sub {
 form "/test", "BlaBleBli" => sub {
    my $self = shift;
    my $obj  = shift;
-   $self->render_text( "form test: " . $obj->bla ) ;
+   $self->render_text( "form test: " . join " - ", @{ $obj->array_of_strs2 } ) ;
 };
 
 app->start
