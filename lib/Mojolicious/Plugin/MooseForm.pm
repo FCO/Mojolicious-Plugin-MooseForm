@@ -154,7 +154,13 @@ sub register {
             my $self = shift;
             my $name = $self->param("name");
             my $attr = $class->meta->get_attribute($name);
-            my $val = $self->param("value");
+            #my $val = $self->param("value");
+            my $params = {};
+            for( $self->param ) {
+               $params->{ $_ }      = $self->param( $_ ) ;
+               $self->stash->{ $_ } = $self->param( $_ ) ;
+            }
+            my $val = $tempGen->get_return($name, $attr->type_constraint, $params);
             $self->app->log->debug("VALUE: $val");
             eval{ $attr->verify_against_type_constraint( $val ) };
             return $self->render_text("OK") unless $@;
